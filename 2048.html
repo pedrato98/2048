@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo 2048</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados para a fonte Inter */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #faf8ef; /* Cor de fundo suave */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* Estilos para o tabuleiro do jogo */
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+            width: 400px; /* Tamanho fixo do tabuleiro */
+            height: 400px;
+            background-color: #bbada0;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            position: relative; /* Para posicionar as peças */
+        }
+
+        /* Estilos para cada célula do tabuleiro (vazia) */
+        .grid-cell {
+            width: 100%;
+            height: 100%;
+            background-color: rgba(238, 228, 218, 0.35); /* Cor das células vazias */
+            border-radius: 3px;
+        }
+
+        /* Estilos para as peças do jogo */
+        .tile {
+            position: absolute; /* Permite posicionamento exato */
+            /* Largura e altura calculadas: (Largura do tabuleiro - 2*padding - 3*gap) / 4 = (400 - 2*10 - 3*10) / 4 = (400 - 20 - 30) / 4 = 350 / 4 = 87.5px */
+            width: 87.5px;
+            height: 87.5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            border-radius: 3px;
+            transition: transform 0.1s ease-in-out, background-color 0.1s ease-in-out, color 0.1s ease-in-out;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            color: #776e65; /* Cor padrão do texto */
+        }
+
+        /* Cores das peças */
+        .tile-2 { background-color: #eee4da; }
+        .tile-4 { background-color: #ede0c8; }
+        .tile-8 { background-color: #f2b179; color: #f9f6f2; }
+        .tile-16 { background-color: #f59563; color: #f9f6f2; }
+        .tile-32 { background-color: #f67c5f; color: #f9f6f2; }
+        .tile-64 { background-color: #f65e3b; color: #f9f6f2; }
+        .tile-128 { background-color: #edcf72; color: #f9f6f2; font-size: 2rem; }
+        .tile-256 { background-color: #edcc61; color: #f9f6f2; font-size: 2rem; }
+        .tile-512 { background-color: #edc850; color: #f9f6f2; font-size: 2rem; }
+        .tile-1024 { background-color: #edc53f; color: #f9f6f2; font-size: 1.5rem; }
+        .tile-2048 { background-color: #edc22e; color: #f9f6f2; font-size: 1.5rem; }
+        /* Para valores maiores, caso o jogo continue */
+        .tile-more { background-color: #3c3a32; color: #f9f6f2; font-size: 1.2rem; }
+
+        /* Animação de aparecimento (para novas peças) */
+        @keyframes pop-in {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+        .tile-new {
+            animation: pop-in 0.2s ease-out;
+        }
+
+        /* Mensagem de jogo */
+        .game-message {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 8px;
+            font-size: 2rem;
+            font-weight: bold;
+            color: #776e65;
+            z-index: 10;
+            text-align: center;
+        }
+        .game-message button {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+    <div class="flex flex-col items-center gap-6 p-8 bg-white rounded-2xl shadow-xl border border-gray-200">
+        <h1 class="text-5xl font-extrabold text-gray-800">
+            <span class="bg-clip-text text-transparent bg-gradient-to-r from-orange-500 to-red-600">
+                2048
+            </span>
+        </h1>
+
+        <div class="flex justify-between w-full max-w-sm mb-4">
+            <div class="bg-gray-200 text-gray-700 p-3 rounded-md font-bold text-xl shadow-inner">
+                Pontuação: <span id="score">0</span>
+            </div>
+            <button id="newGameButton"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transform transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-400 focus:ring-opacity-75">
+                Novo Jogo
+            </button>
+        </div>
+
+        <div id="game-board">
+            </div>
+
+        <div id="game-message" class="game-message hidden">
+            <span id="message-text"></span>
+            <button id="tryAgainButton"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transform transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-400 focus:ring-opacity-75">
+                Tentar Novamente
+            </button>
+        </div>
+
+        <p class="text-gray-600 text-sm mt-4 text-center">
+            Use as setas do teclado (↑ ↓ ← →) para mover as peças.
+            <br>Combine números iguais para criar peças maiores!
+        </p>
+    </div>
+
+    <script>
+        const boardSize = 4;
+        let board = []; // Matriz 4x4 que representa o tabuleiro
+        let score = 0;
+        let gameOver = false;
+        let gameWon = false;
+
+        const gameBoardElement = document.getElementById('game-board');
+        const scoreElement = document.getElementById('score');
+        const newGameButton = document.getElementById('newGameButton');
+        const gameMessageElement = document.getElementById('game-message');
+        const messageTextElement = document.getElementById('message-text');
+        const tryAgainButton = document.getElementById('tryAgainButton');
+
+        // Constantes para o cálculo de posicionamento das peças
+        const TILE_SIZE = 87.5; // Largura/altura da peça (calculado: (400 - 2*10 padding - 3*10 gap) / 4 = 87.5)
+        const TILE_GAP = 10;    // Espaçamento entre as peças
+        const BOARD_PADDING = 10; // Preenchimento interno do tabuleiro
+
+        // Inicializa o tabuleiro com células vazias
+        function initializeBoard() {
+            board = Array(boardSize).fill(0).map(() => Array(boardSize).fill(0));
+            score = 0;
+            gameOver = false;
+            gameWon = false;
+            scoreElement.textContent = score;
+            gameMessageElement.classList.add('hidden'); // Esconde a mensagem de jogo
+            renderBoard(); // Renderiza o tabuleiro vazio
+            addRandomTile(); // Adiciona duas peças iniciais
+            addRandomTile();
+        }
+
+        // Adiciona uma nova peça (2 ou 4) numa posição vazia aleatória
+        function addRandomTile() {
+            if (isBoardFull()) {
+                return;
+            }
+            let row, col;
+            do {
+                row = Math.floor(Math.random() * boardSize);
+                col = Math.floor(Math.random() * boardSize);
+            } while (board[row][col] !== 0); // Encontra uma célula vazia
+
+            const newValue = Math.random() < 0.9 ? 2 : 4; // 90% de chance de ser 2, 10% de ser 4
+            board[row][col] = newValue;
+            renderTile(row, col, newValue, true); // Renderiza a nova peça com animação
+        }
+
+        // Verifica se o tabuleiro está cheio
+        function isBoardFull() {
+            for (let r = 0; r < boardSize; r++) {
+                for (let c = 0; c < boardSize; c++) {
+                    if (board[r][c] === 0) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        // Renderiza o tabuleiro completo
+        function renderBoard() {
+            gameBoardElement.innerHTML = ''; // Limpa o tabuleiro HTML
+
+            // Adiciona as células de fundo (para o visual da grelha)
+            for (let r = 0; r < boardSize; r++) {
+                for (let c = 0; c < boardSize; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('grid-cell');
+                    gameBoardElement.appendChild(cell);
+                }
+            }
+
+            // Adiciona as peças com base no estado da matriz 'board'
+            for (let r = 0; r < boardSize; r++) {
+                for (let c = 0; c < boardSize; c++) {
+                    if (board[r][c] !== 0) {
+                        renderTile(r, c, board[r][c]);
+                    }
+                }
+            }
+        }
+
+        // Renderiza uma única peça no tabuleiro
+        function renderTile(row, col, value, isNew = false) {
+            const tile = document.createElement('div');
+            tile.classList.add('tile', `tile-${value > 2048 ? 'more' : value}`);
+            tile.textContent = value;
+            // Calcula a posição da peça com base no tamanho da peça, gap e padding do tabuleiro
+            tile.style.top = `${row * (TILE_SIZE + TILE_GAP) + BOARD_PADDING}px`;
+            tile.style.left = `${col * (TILE_SIZE + TILE_GAP) + BOARD_PADDING}px`;
+
+            if (isNew) {
+                tile.classList.add('tile-new'); // Adiciona classe para animação de pop-in
+            }
+
+            gameBoardElement.appendChild(tile);
+        }
+
+        // Função principal para mover as peças
+        function moveTiles(direction) {
+            if (gameOver || gameWon) return;
+
+            let hasMoved = false;
+            // Não é necessário copiar o tabuleiro aqui, a função slideAndMerge determinará se houve movimento
+            // let originalBoard = JSON.parse(JSON.stringify(board));
+
+            if (direction === 'up') {
+                for (let col = 0; col < boardSize; col++) {
+                    hasMoved = slideAndMerge(col, 'up') || hasMoved;
+                }
+            } else if (direction === 'down') {
+                for (let col = 0; col < boardSize; col++) {
+                    hasMoved = slideAndMerge(col, 'down') || hasMoved;
+                }
+            } else if (direction === 'left') {
+                for (let row = 0; row < boardSize; row++) {
+                    hasMoved = slideAndMerge(row, 'left') || hasMoved;
+                }
+            } else if (direction === 'right') {
+                for (let row = 0; row < boardSize; row++) {
+                    hasMoved = slideAndMerge(row, 'right') || hasMoved;
+                }
+            }
+
+            if (hasMoved) {
+                renderBoard(); // Renderiza o tabuleiro após os movimentos
+                setTimeout(() => { // Pequeno atraso para a animação
+                    addRandomTile();
+                    checkGameStatus();
+                }, 100);
+            } else {
+                // Se não houve movimento, ainda verifica o status do jogo (pode estar preso)
+                checkGameStatus();
+            }
+        }
+
+        // Função auxiliar para deslizar e fundir peças numa linha/coluna
+        function slideAndMerge(index, direction) {
+            let line = [];
+            if (direction === 'up' || direction === 'down') {
+                for (let r = 0; r < boardSize; r++) line.push(board[r][index]);
+            } else { // left or right
+                for (let c = 0; c < boardSize; c++) line.push(board[index][c]);
+            }
+
+            // Remove zeros
+            let filteredLine = line.filter(val => val !== 0);
+            let hasChanged = false; // Flag para verificar se a linha mudou
+
+            // Funde peças
+            if (direction === 'up' || direction === 'left') {
+                for (let i = 0; i < filteredLine.length - 1; i++) {
+                    if (filteredLine[i] === filteredLine[i + 1]) {
+                        filteredLine[i] *= 2;
+                        score += filteredLine[i];
+                        if (filteredLine[i] === 2048) gameWon = true;
+                        filteredLine.splice(i + 1, 1); // Remove a peça fundida
+                        hasChanged = true;
+                    }
+                }
+            } else { // down or right
+                for (let i = filteredLine.length - 1; i > 0; i--) {
+                    if (filteredLine[i] === filteredLine[i - 1]) {
+                        filteredLine[i] *= 2;
+                        score += filteredLine[i];
+                        if (filteredLine[i] === 2048) gameWon = true;
+                        filteredLine.splice(i - 1, 1); // Remove a peça fundida
+                        hasChanged = true;
+                    }
+                }
+            }
+
+            // Preenche com zeros para o tamanho original
+            while (filteredLine.length < boardSize) {
+                if (direction === 'up' || direction === 'left') {
+                    filteredLine.push(0);
+                } else {
+                    filteredLine.unshift(0);
+                }
+            }
+
+            // Compara a linha original com a linha processada para determinar se houve mudança
+            for (let i = 0; i < boardSize; i++) {
+                if (line[i] !== filteredLine[i]) {
+                    hasChanged = true;
+                    break;
+                }
+            }
+
+            // Atualiza o tabuleiro
+            if (direction === 'up' || direction === 'down') {
+                for (let r = 0; r < boardSize; r++) {
+                    board[r][index] = filteredLine[r];
+                }
+            } else { // left or right
+                for (let c = 0; c < boardSize; c++) {
+                    board[index][c] = filteredLine[c];
+                }
+            }
+            scoreElement.textContent = score;
+            return hasChanged;
+        }
+
+        // Verifica o estado do jogo (vitória ou derrota)
+        function checkGameStatus() {
+            if (gameWon) {
+                showMessage('Você Venceu! Chegou a 2048!', 'win');
+                gameOver = true;
+                return;
+            }
+
+            if (!hasPossibleMoves() && isBoardFull()) {
+                showMessage('Fim de Jogo! Nenhuma jogada possível.', 'error');
+                gameOver = true;
+            }
+        }
+
+        // Verifica se ainda existem movimentos possíveis (deslizar ou fundir)
+        function hasPossibleMoves() {
+            // Verifica se há células vazias
+            if (!isBoardFull()) return true;
+
+            // Verifica movimentos horizontais
+            for (let r = 0; r < boardSize; r++) {
+                for (let c = 0; c < boardSize - 1; c++) {
+                    if (board[r][c] === board[r][c + 1]) return true;
+                }
+            }
+
+            // Verifica movimentos verticais
+            for (let c = 0; c < boardSize; c++) {
+                for (let r = 0; r < boardSize - 1; r++) {
+                    if (board[r][c] === board[r + 1][c]) return true;
+                }
+            }
+            return false;
+        }
+
+        // Exibe uma mensagem de jogo (vitória/derrota)
+        function showMessage(msg, type) {
+            messageTextElement.textContent = msg;
+            gameMessageElement.classList.remove('hidden');
+            if (type === 'win') {
+                messageTextElement.classList.add('text-green-600');
+                messageTextElement.classList.remove('text-red-600');
+            } else {
+                messageTextElement.classList.add('text-red-600');
+                messageTextElement.classList.remove('text-green-600');
+            }
+        }
+
+        // Event Listeners
+        document.addEventListener('keydown', (e) => {
+            if (gameOver || gameWon) return; // Não permite movimentos após o fim do jogo
+
+            if (e.key === 'ArrowUp') {
+                moveTiles('up');
+            } else if (e.key === 'ArrowDown') {
+                moveTiles('down');
+            } else if (e.key === 'ArrowLeft') {
+                moveTiles('left');
+            } else if (e.key === 'ArrowRight') {
+                moveTiles('right');
+            }
+        });
+
+        newGameButton.addEventListener('click', initializeBoard);
+        tryAgainButton.addEventListener('click', initializeBoard); // Botão "Tentar Novamente"
+
+        // Inicia o jogo quando a página carrega
+        window.onload = initializeBoard;
+    </script>
+</body>
+</html>
